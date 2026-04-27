@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Grafo – Datasets × Métodos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #ffffff;
+    font-family: 'IBM Plex Sans', sans-serif;
+    color: #1a1a2e;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #1a5fa8;
+    position: absolute;
+    top: 18px; left: 20px;
+    z-index: 10;
+  }
+
+  #subtitle {
+    font-size: 11px;
+    color: #555555;
+    position: absolute;
+    top: 36px; left: 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    z-index: 10;
+  }
+
+  svg { width: 100vw; height: 100vh; }
+
+  .link {
+    stroke-opacity: 0.7;
+    stroke-linecap: round;
+  }
+
+  .node circle {
+    stroke-width: 2;
+    cursor: grab;
+    transition: filter 0.2s;
+  }
+
+  .node circle:hover { filter: brightness(1.4); }
+  .node circle:active { cursor: grabbing; }
+
+  .node text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    pointer-events: none;
+    paint-order: stroke fill;
+    stroke: #ffffff;
+    stroke-width: 3px;
+    font-weight: 600;
+  }
+
+  /* Legend */
+  #legend {
+    position: absolute;
+    bottom: 20px; left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    z-index: 10;
+  }
+
+  .leg-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: #333333;
+  }
+
+  .leg-circle {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  #tooltip {
+    position: absolute;
+    background: #f0f4f8;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: #1a1a2e;
+    pointer-events: none;
+    display: none;
+    z-index: 100;
+    max-width: 200px;
+    line-height: 1.6;
+  }
+
+  #info {
+    position: absolute;
+    top: 18px; right: 20px;
+    font-size: 11px;
+    color: #aaaaaa;
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: right;
+    z-index: 10;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+<h1>Datasets × Métodos de IA</h1>
+<div id="subtitle">grafo bipartido · pesos por espessura</div>
+
+<div id="info">
+  arraste os nós<br>
+  scroll para zoom<br>
+  hover para detalhes
+</div>
+
+<div id="legend">
+  <div class="leg-item"><div class="leg-circle" style="background:#1a5fa8"></div> Dataset</div>
+  <div class="leg-item"><div class="leg-circle" style="background:#c0392b"></div> Método</div>
+  <div class="leg-item">
+    <svg width="40" height="8">
+      <line x1="0" y1="4" x2="40" y2="4" stroke="#8b949e" stroke-width="1"/>
+    </svg> peso 1
+  </div>
+  <div class="leg-item">
+    <svg width="40" height="8">
+      <line x1="0" y1="4" x2="40" y2="4" stroke="#8b949e" stroke-width="3"/>
+    </svg> peso 2–3
+  </div>
+  <div class="leg-item">
+    <svg width="40" height="8">
+      <line x1="0" y1="4" x2="40" y2="4" stroke="#8b949e" stroke-width="6"/>
+    </svg> peso 4–5
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<svg id="graph"></svg>
+
+<script>
+const datasets = [
+  { id: "D1", label: "Saúde",                    group: "dataset" },
+  { id: "D2", label: "Tráfego",                  group: "dataset" },
+  { id: "D3", label: "Saúde Ambiental",          group: "dataset" },
+  { id: "D4", label: "Repositório",              group: "dataset" },
+  { id: "D5", label: "Energia",                  group: "dataset" },
+  { id: "D6", label: "Clima/Temperatura",        group: "dataset" },
+  { id: "D7", label: "Geofísica",                group: "dataset" },
+  { id: "D8", label: "Sensores Industriais",     group: "dataset" },
+  { id: "D9", label: "Detecção de Anomalias",    group: "dataset" },
+  { id: "D10", label: "Segurança Cibernética",   group: "dataset" },
+  { id: "D11", label: "MNIST",                   group: "dataset" },
+  { id: "D12", label: "C-MAPSS",                 group: "dataset" },
+];
+
+const methods = [
+  { id: "RNN",   label: "RNN",                group: "method" },
+  { id: "GNN",   label: "GNN",                group: "method" },
+  { id: "TRF",   label: "Transformers",       group: "method" },
+  { id: "GAN",   label: "GAN",                group: "method" },
+  { id: "STAT",  label: "Mét. Estatísticos",  group: "method" },
+  { id: "GAUSS", label: "Mét. Gaussiano",     group: "method" },
+  { id: "DAE",   label: "DAE",                group: "method" },
+  { id: "SAITS", label: "SAITS",              group: "method" },
+  { id: "VAE",   label: "VAE",                group: "method" },
+  { id: "MAE",   label: "MAE",                group: "method" },
+  { id: "MTSC",  label: "MTSC",               group: "method" },
+];
+
+const rawEdges = [
+  // D1
+  { source:"D1", target:"RNN",   weight:1 },
+  { source:"D1", target:"GNN",   weight:1 },
+  { source:"D1", target:"TRF",   weight:2 },
+  { source:"D1", target:"GAN",   weight:2 },
+  { source:"D1", target:"STAT",  weight:1 },
+  { source:"D1", target:"GAUSS", weight:1 },
+  { source:"D1", target:"DAE",   weight:1 },
+  // D2
+  { source:"D2", target:"RNN",   weight:2 },
+  { source:"D2", target:"GNN",   weight:5 },
+  { source:"D2", target:"SAITS", weight:1 },
+  { source:"D2", target:"STAT",  weight:1 },
+  { source:"D2", target:"VAE",   weight:1 },
+  // D3
+  { source:"D3", target:"RNN",   weight:1 },
+  { source:"D3", target:"GNN",   weight:1 },
+  { source:"D3", target:"TRF",   weight:1 },
+  // D4
+  { source:"D4", target:"RNN",   weight:1 },
+  { source:"D4", target:"GNN",   weight:1 },
+  { source:"D4", target:"TRF",   weight:2 },
+  { source:"D4", target:"SAITS", weight:1 },
+  { source:"D4", target:"STAT",  weight:1 },
+  { source:"D4", target:"GAUSS", weight:2 },
+  // D5
+  { source:"D5", target:"RNN",   weight:1 },
+  { source:"D5", target:"TRF",   weight:1 },
+  { source:"D5", target:"SAITS", weight:1 },
+  { source:"D5", target:"STAT",  weight:1 },
+  { source:"D5", target:"GAUSS", weight:1 },
+  { source:"D5", target:"MAE",   weight:1 },
+  { source:"D5", target:"MTSC",  weight:1 },
+  // D6
+  { source:"D6", target:"GNN",   weight:1 },
+  { source:"D6", target:"SAITS", weight:1 },
+  { source:"D6", target:"STAT",  weight:1 },
+  { source:"D6", target:"MAE",   weight:1 },
+  // D7
+  { source:"D7", target:"RNN",   weight:1 },
+  { source:"D7", target:"GNN",   weight:1 },
+  // D8
+  { source:"D8", target:"RNN",   weight:1 },
+  { source:"D8", target:"TRF",   weight:1 },
+  // D9
+  { source:"D9", target:"RNN",   weight:1 },
+  { source:"D9", target:"TRF",   weight:1 },
+  { source:"D9", target:"VAE",   weight:1 },
+  // D10
+  { source:"D10", target:"RNN",  weight:1 },
+  { source:"D10", target:"VAE",  weight:1 },
+  // D11
+  { source:"D11", target:"GNN",   weight:1 },
+  { source:"D11", target:"SAITS", weight:1 },
+  // D12
+  { source:"D12", target:"RNN",  weight:1 },
+];
+
+const nodes = [...datasets, ...methods];
+const nodeIndex = {};
+nodes.forEach((n, i) => nodeIndex[n.id] = i);
+
+const links = rawEdges.map(e => ({
+  source: nodeIndex[e.source],
+  target: nodeIndex[e.target],
+  weight: e.weight,
+  sourceId: e.source,
+  targetId: e.target,
+}));
+
+// Compute degree for node sizing
+const degree = {};
+nodes.forEach(n => degree[n.id] = 0);
+rawEdges.forEach(e => {
+  degree[e.source] = (degree[e.source] || 0) + e.weight;
+  degree[e.target] = (degree[e.target] || 0) + e.weight;
+});
+
+const W = window.innerWidth, H = window.innerHeight;
+
+const svg = d3.select("#graph")
+  .call(d3.zoom().scaleExtent([0.3, 3]).on("zoom", e => {
+    g.attr("transform", e.transform);
+  }));
+
+const g = svg.append("g");
+
+// Edge color scale by weight
+const edgeColor = w => w >= 4 ? "#c0392b" : w >= 2 ? "#e67e22" : "#999999";
+
+const link = g.append("g").selectAll("line")
+  .data(links).join("line")
+  .attr("class", "link")
+  .attr("stroke", d => edgeColor(d.weight))
+  .attr("stroke-width", d => Math.sqrt(d.weight) * 1.8);
+
+const node = g.append("g").selectAll("g")
+  .data(nodes).join("g")
+  .attr("class", "node")
+  .call(d3.drag()
+    .on("start", (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+    .on("drag",  (event, d) => { d.fx=event.x; d.fy=event.y; })
+    .on("end",   (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx=null; d.fy=null; })
+  );
+
+const tooltip = document.getElementById("tooltip");
+
+node.append("circle")
+  .attr("r", d => {
+    const base = d.group === "dataset" ? 14 : 10;
+    return base + Math.sqrt(degree[d.id]) * 2;
+  })
+  .attr("fill", d => d.group === "dataset" ? "#d6e8ff" : "#ffe0d6")
+  .attr("stroke", d => d.group === "dataset" ? "#1a5fa8" : "#c0392b")
+  .on("mouseover", (event, d) => {
+    const edges = rawEdges.filter(e => e.source === d.id || e.target === d.id);
+    let html = `<strong>${d.label}</strong><br>`;
+    if (d.group === "dataset") {
+      html += edges.map(e => `${e.target} → ${e.weight}`).join("<br>");
+    } else {
+      html += `Conectado a ${edges.length} dataset(s)<br>`;
+      html += `Soma pesos: ${edges.reduce((a,b) => a + b.weight, 0)}`;
+    }
+    tooltip.innerHTML = html;
+    tooltip.style.display = "block";
+    tooltip.style.left = (event.pageX + 12) + "px";
+    tooltip.style.top  = (event.pageY - 20) + "px";
+  })
+  .on("mousemove", event => {
+    tooltip.style.left = (event.pageX + 12) + "px";
+    tooltip.style.top  = (event.pageY - 20) + "px";
+  })
+  .on("mouseout", () => tooltip.style.display = "none");
+
+node.append("text")
+  .attr("dy", d => {
+    const base = d.group === "dataset" ? 14 : 10;
+    return base + Math.sqrt(degree[d.id]) * 2 + 12;
+  })
+  .attr("text-anchor", "middle")
+  .attr("fill", d => d.group === "dataset" ? "#1a5fa8" : "#c0392b")
+  .text(d => d.label);
+
+const sim = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id((_, i) => i).distance(d => 160 + (5 - d.weight) * 18).strength(0.5))
+  .force("charge", d3.forceManyBody().strength(-500))
+  .force("center", d3.forceCenter(W/2, H/2))
+  .force("collision", d3.forceCollide(d => {
+    const base = d.group === "dataset" ? 14 : 10;
+    return base + Math.sqrt(degree[d.id]) * 2 + 18;
+  }))
+  .on("tick", () => {
+    link
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+  });
+</script>
+</body>
+</html>
